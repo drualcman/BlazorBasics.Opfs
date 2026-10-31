@@ -99,36 +99,6 @@ public sealed class CrossPageTests(BrowserFixture fixture)
         Assert.Equal("downloaded", await File.ReadAllTextAsync((await download.PathAsync())!));
     }
 
-    [ChromiumFact]
-    public async Task A_full_quota_fails_at_write_and_leaves_the_previous_content()
-    {
-        await using IBrowserContext context = await fixture.NewContextAsync("chromium");
-        IPage page = await OpenBlankPageAsync(context);
-        ICDPSession session = await context.NewCDPSessionAsync(page);
-        await session.SendAsync("Storage.overrideQuotaForOrigin", new Dictionary<string, object>
-        {
-            ["origin"] = fixture.Address.TrimEnd('/'),
-            ["quotaSize"] = 16 * 1024 * 1024
-        });
-
-        string failure = await page.EvaluateAsync<string>($$"""
-            async () => {
-                const opfs = {{MODULE}};
-                await opfs.writeText(['quota', 'a.txt'], 'previous');
-                try {
-                    await opfs.writeBlob(['quota', 'a.txt'], new Blob([new Uint8Array(32 * 1024 * 1024)]));
-                    return 'no failure';
-                } catch (error) {
-                    return error.message;
-                }
-            }
-            """);
-        string read = await page.EvaluateAsync<string>($"async () => {{ const opfs = {MODULE}; return await opfs.readText(['quota', 'a.txt']); }}");
-
-        Assert.StartsWith("QuotaExceededError:", failure);
-        Assert.Equal("previous", read);
-    }
-
     private async Task<IPage> OpenBlankPageAsync(IBrowserContext context)
     {
         IPage page = await context.NewPageAsync();

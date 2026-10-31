@@ -17,4 +17,7 @@ internal static partial class TestHooks
 
     [JSImport("globalThis.opfsTestHooks.heapBytes")]
     public static partial double HeapBytes();
+
+    [JSImport("globalThis.opfsTestHooks.queryValue")]
+    public static partial string? QueryValue(string name);
 }

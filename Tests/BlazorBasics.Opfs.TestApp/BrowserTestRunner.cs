@@ -4,17 +4,17 @@ namespace BlazorBasics.Opfs.TestApp;
 
 /// <summary>
 /// Runs every <c>[Fact]</c> and <c>[Theory]</c> row of the given classes in this browser, one after another, each with a new
-/// instance, and names each result after the class that declares the test.
+/// instance, and names each result after the class that declares the test. <paramref name="onlyTest"/> narrows it to one method.
 /// </summary>
 internal static class BrowserTestRunner
 {
-    public static async Task<List<BrowserTestResult>> RunAsync(IEnumerable<Type> testClasses)
+    public static async Task<List<BrowserTestResult>> RunAsync(IEnumerable<Type> testClasses, string? onlyTest = null)
     {
         List<BrowserTestResult> results = [];
         foreach (Type testClass in testClasses)
         {
             IEnumerable<MethodInfo> tests = testClass.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                .Where(method => method.GetCustomAttribute<FactAttribute>() is not null)
+                .Where(method => method.GetCustomAttribute<FactAttribute>() is not null && (onlyTest is null || method.Name == onlyTest))
                 .OrderBy(method => method.Name, StringComparer.Ordinal);
             foreach (MethodInfo test in tests)
             {

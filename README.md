@@ -143,13 +143,48 @@ Measured on Chromium 156, Firefox 157 and WebKit 27.2 on Linux:
 | Reading a snapshot after the file was written | `NotReadableError` | `AbortError` | Gives the new content, with no error |
 | Moving a file with an open writer on it | Refuses | Refuses | Moves it |
 | Extra space during a `keepExistingData` write | The whole file | The whole file | Not visible in the estimate |
-| The estimate going down after a file is removed | Yes | Yes | **No** |
+| The estimate going down after a file is removed | Yes | Yes | **No**, only near the quota or after a restart |
+| Where the swap of a write lives | The profile | The profile | **The temporary folder of the system** |
+
+When the quota runs out, all three engines fail at `write`, never at `close`, with `QuotaExceededError`, which arrives as
+`OpfsQuotaExceededException`. The previous content stays and no visible leftovers remain, on every way of writing:
+writers, `WriteBytesAsync`, `CopyAsync` and `FetchToAsync`. What differs is around that:
+
+| Behaviour | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| Quota of the origin | From the free disk | From the free disk | 1000 MiB, whatever the disk |
+| Replacing a file over half the quota | Fails: the swap counts | Fails: the swap counts | Fails: the staged copy counts |
+| `keepExistingData` on a file over half the quota | Fails at `createWritable` | Works, and the estimate stops counting the file | Fails |
+| The quota after hitting it | Unchanged | Unchanged | **Drops to 5 MiB** until the browser restarts |
+| A disk that is really full | `QuotaExceededError` | `QuotaExceededError`, then `UnknownError` until there is space | `QuotaExceededError`, or `UnknownError` as a plain `OpfsException` if the swap itself did not fit |
+
+A swap file is what a write leaves behind when it never finishes:
+
+| Abandoned by | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| A closed page | Removed, space back at once | Removed, space back at once | Removed, the estimate stays high |
+| A killed browser | Stays and counts against the quota | Stays and counts against the quota | Stays in the temporary folder, does not count against the quota |
+| Who cleans it | `DeleteAsync` on the file, or on its folder | `DeleteAsync` on the file | Nobody: the system, when it empties that folder |
+
+Listings never show these leftovers: names ending in `.crswap` or `.opfs-staged` are left out, so do not give those endings
+to your own files.
 
 - **Snapshots** are only valid until the next write. Do not let a write overlap a series of reads.
 - **`keepExistingData`** copies the whole file for as long as the writer is open, so usage doubles for a moment.
-- **The estimate is only an estimate.** In the WebKit run it never went down, so do not refuse a write on it alone.
+- **Keep every file under half of the quota** if it has to be replaced or appended to, because of the swap.
+- **The estimate is only an estimate.** In WebKit it reached 955 MiB with no files, and 1000 MiB could still be written:
+  the number blocks nothing, and it says nothing about real space. Do not refuse a write on it alone.
+- **WebKit keeps a full copy of every finished write.** `close` copies the swap into place and leaves it in the temporary
+  folder of the system, even when the browser closes normally. It never counts against the quota, but it is real disk space.
+- **WebKit's `close` does not check that copy.** On a nearly full disk it reports success and leaves a short file, with the
+  previous content gone: with 40 MiB free, a raw 30 MiB write left 9.87 MiB. This package protects you from it: in WebKit
+  each write closes into a staged file, checks its length, and only then replaces the real file, so a write that does not
+  fit fails with `OpfsQuotaExceededException` and the previous content stays. The price is one more copy on the disk during
+  each write. Code that calls `createWritable` itself is not protected.
 - **`move()` overwrites** an existing destination in all three engines. A busy file is reported, never copied around.
-- **A closed tab** leaves the previous content and no visible leftovers in all three engines.
+- **A closed tab or a killed browser** leaves the previous content and no visible leftovers in all three engines.
+
+The WebKit figures come from Playwright's build on Linux. Safari may differ, above all in the quota and the temporary folder.
 
 ## From JavaScript
 
@@ -181,7 +216,10 @@ abstractions.
 dotnet test Tests/BlazorBasics.Opfs.Tests           # no browser: paths, errors, the double, the battery on the double
 dotnet test Tests/BlazorBasics.Opfs.BrowserTests    # the battery in real browsers
 pwsh Tests/run-webkit-tests.ps1                     # the same in WebKit, on Linux through Docker
+pwsh Tests/run-webkit-tests.ps1 -Browsers chromium,firefox,webkit    # all three on Linux
 ```
+
+The tests that kill a browser or fill a disk only run in that container, which gives them a volume of their own.
 
 The browser tests need Playwright's browsers once:
 `pwsh Tests/BlazorBasics.Opfs.BrowserTests/bin/Debug/net10.0/playwright.ps1 install chromium firefox`.

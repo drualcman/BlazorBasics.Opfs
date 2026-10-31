@@ -28,18 +28,54 @@ public sealed class BrowserFixture : IAsyncLifetime
     public Task<IReadOnlyDictionary<string, BrowserTestOutcome>> OutcomesOfAsync(string engine) =>
         Runs.GetOrAdd(engine, name => new Lazy<Task<IReadOnlyDictionary<string, BrowserTestOutcome>>>(() => RunAsync(name))).Value;
 
-    public async Task<IBrowserContext> NewContextAsync(string engine)
+    public Task<IBrowserContext> NewContextAsync(string engine) => OpenProfileAsync(engine, NewProfile(Path.GetTempPath()));
+
+    public string NewProfile(string parentFolder)
     {
-        string profile = Path.Combine(Path.GetTempPath(), $"opfs-tests-{Guid.NewGuid():N}");
+        string profile = Path.Combine(parentFolder, $"opfs-tests-{Guid.NewGuid():N}");
         ProfileFolders.Add(profile);
-        return await Playwright[engine].LaunchPersistentContextAsync(profile, new BrowserTypeLaunchPersistentContextOptions { Headless = true, AcceptDownloads = true });
+        return profile;
     }
 
-    private async Task<IReadOnlyDictionary<string, BrowserTestOutcome>> RunAsync(string engine)
+    public string NewLimitedProfile(string engine, string? parentFolder = null)
     {
-        await using IBrowserContext context = await NewContextAsync(engine);
+        string profile = NewProfile(parentFolder ?? Path.GetTempPath());
+        if (engine == BrowserEngines.FIREFOX)
+        {
+            Directory.CreateDirectory(profile);
+            File.WriteAllText(Path.Combine(profile, StorageLimits.FIREFOX_USER_FILE), StorageLimits.FIREFOX_USER_PREFERENCE);
+        }
+        return profile;
+    }
+
+    public async Task<IBrowserContext> OpenProfileAsync(string engine, string profile, string? temporaryFolder = null)
+    {
+        BrowserTypeLaunchPersistentContextOptions options = new() { Headless = true, AcceptDownloads = true };
+        if (temporaryFolder is not null)
+        {
+            options.Env = new Dictionary<string, string> { ["TMPDIR"] = temporaryFolder };
+        }
+        return await Playwright[engine].LaunchPersistentContextAsync(profile, options);
+    }
+
+    public async Task<IPage> OpenLimitedPageAsync(IBrowserContext context, string engine, string relativeAddress)
+    {
         IPage page = await context.NewPageAsync();
-        await page.GotoAsync(Address);
+        if (engine == BrowserEngines.CHROMIUM)
+        {
+            ICDPSession session = await context.NewCDPSessionAsync(page);
+            await session.SendAsync("Storage.overrideQuotaForOrigin", new Dictionary<string, object>
+            {
+                ["origin"] = Address.TrimEnd('/'),
+                ["quotaSize"] = StorageLimits.CHROMIUM_QUOTA_BYTES
+            });
+        }
+        await page.GotoAsync($"{Address.TrimEnd('/')}/{relativeAddress}");
+        return page;
+    }
+
+    public async Task<IReadOnlyDictionary<string, BrowserTestOutcome>> OutcomesOnAsync(IPage page)
+    {
         await page.WaitForFunctionAsync("() => globalThis.opfsContractResults !== undefined || globalThis.opfsFailed !== undefined",
             null, new PageWaitForFunctionOptions { Timeout = RUN_TIMEOUT_MILLISECONDS });
         string? json = await page.EvaluateAsync<string?>("() => globalThis.opfsContractResults ?? null");
@@ -48,6 +84,14 @@ public sealed class BrowserFixture : IAsyncLifetime
             throw new InvalidOperationException($"The test app failed: {await page.EvaluateAsync<string>("() => globalThis.opfsFailed")}");
         }
         return JsonSerializer.Deserialize<List<BrowserTestOutcome>>(json)!.ToDictionary(outcome => outcome.Name);
+    }
+
+    private async Task<IReadOnlyDictionary<string, BrowserTestOutcome>> RunAsync(string engine)
+    {
+        await using IBrowserContext context = await NewContextAsync(engine);
+        IPage page = await context.NewPageAsync();
+        await page.GotoAsync(Address);
+        return await OutcomesOnAsync(page);
     }
 
     public async Task DisposeAsync()

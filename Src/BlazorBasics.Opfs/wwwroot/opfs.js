@@ -4,6 +4,18 @@
 
 const state = globalThis.__blazorBasicsOpfs ??= { operations: new Map(), releasingLocks: new Map() };
 
+const CHROMIUM_SWAP_SUFFIX = '.crswap';
+const STAGED_SUFFIX = '.opfs-staged';
+
+// WebKit's close copies the swap over the file without checking the copy, so a nearly full disk cuts the file with no error
+// and the previous content is gone. There, a write closes into a staged file, checks its length and only then moves it in.
+// An empty writable, the holder, keeps the real file busy meanwhile, as a direct write would.
+const stagesWrites = /AppleWebKit/.test(navigator.userAgent) && !/(Chrome|Chromium|Edg|OPR)\//.test(navigator.userAgent);
+
+function isLeftover(name) {
+    return name.endsWith(CHROMIUM_SWAP_SUFFIX) || name.endsWith(STAGED_SUFFIX);
+}
+
 function described(error) {
     const name = error?.name ?? 'AbortError';
     const message = error?.message ?? 'The stream was already closed or aborted.';
@@ -126,7 +138,7 @@ export const listFolder = guarded(async (names, textSuffix) => {
     for (const [name, handle] of await entriesOf(await folder(names))) {
         if (handle.kind === 'directory') {
             content.folders.push(name);
-        } else {
+        } else if (!isLeftover(name)) {
             const info = await describeFile(name, handle, textSuffix);
             if (info !== null) {
                 content.files.push(info);
@@ -141,7 +153,7 @@ async function walk(target, prefix, textSuffix, files) {
         const relative = prefix ? `${prefix}/${name}` : name;
         if (handle.kind === 'directory') {
             await walk(handle, relative, textSuffix, files);
-        } else {
+        } else if (!isLeftover(name)) {
             const info = await describeFile(relative, handle, textSuffix);
             if (info !== null) {
                 files.push(info);
@@ -182,38 +194,71 @@ export const requireFile = guarded(async names => await fileOf(names));
 
 // ---- Writing ----
 
-async function forget(target) {
-    if (target.created) {
-        try {
-            await target.parent.removeEntry(target.name);
-        } catch (error) {
-            if (error?.name !== 'NoModificationAllowedError' && error?.name !== 'NotFoundError') {
-                throw error;
-            }
+async function removeIfFree(parent, name) {
+    try {
+        await parent.removeEntry(name);
+    } catch (error) {
+        if (error?.name !== 'NoModificationAllowedError' && error?.name !== 'NotFoundError') {
+            throw error;
         }
     }
 }
 
-async function openTarget(names, keepExistingData) {
-    const parent = await folder(names.slice(0, -1), true);
-    const name = names.at(-1);
-    const existing = await orNull(() => parent.getFileHandle(name));
-    const handle = existing ?? await parent.getFileHandle(name, { create: true });
-    const target = { parent, name, handle, writable: null, created: existing === null };
+async function forget(target) {
+    if (target.staged !== null) {
+        await removeIfFree(target.parent, target.name + STAGED_SUFFIX);
+    }
+    if (target.created) {
+        await removeIfFree(target.parent, target.name);
+    }
+}
+
+async function openStaged(target, keepExistingData) {
+    target.holder = await target.handle.createWritable();
+    target.staged = await target.parent.getFileHandle(target.name + STAGED_SUFFIX, { create: true });
+    target.writable = await target.staged.createWritable();
+    if (keepExistingData) {
+        const file = await target.handle.getFile();
+        await target.writable.write(file);
+        target.length = file.size;
+    }
+}
+
+async function openWritable(target, keepExistingData) {
     try {
-        target.writable = await handle.createWritable({ keepExistingData });
+        if (stagesWrites && typeof target.handle.move === 'function') {
+            await openStaged(target, keepExistingData);
+        } else {
+            target.writable = await target.handle.createWritable({ keepExistingData });
+        }
     } catch (error) {
-        await forget(target);
+        if (error?.name === 'QuotaExceededError' && target.staged === null) {
+            await removeIfFree(target.parent, target.name + CHROMIUM_SWAP_SUFFIX);
+        }
+        await abandon(target);
         throw error;
     }
+}
+
+async function openTargetIn(parent, name, keepExistingData) {
+    const existing = await orNull(() => parent.getFileHandle(name));
+    const handle = existing ?? await parent.getFileHandle(name, { create: true });
+    const target = { parent, name, handle, staged: null, holder: null, writable: null, created: existing === null, length: 0 };
+    await openWritable(target, keepExistingData);
     return target;
 }
 
+async function openTarget(names, keepExistingData) {
+    return await openTargetIn(await folder(names.slice(0, -1), true), names.at(-1), keepExistingData);
+}
+
 async function abandon(target) {
-    try {
-        await target.writable.abort();
-    } catch {
-        // The failure that led here is the one to report.
+    for (const writable of [target.writable, target.holder]) {
+        try {
+            await writable?.abort();
+        } catch {
+            // The failure that led here is the one to report.
+        }
     }
     try {
         await forget(target);
@@ -222,11 +267,27 @@ async function abandon(target) {
     }
 }
 
-async function writeWhole(names, keepExistingData, write) {
-    const target = await openTarget(names, keepExistingData);
+async function put(target, bytes) {
+    await target.writable.write(bytes);
+    target.length += bytes.byteLength;
+}
+
+async function finish(target) {
+    await target.writable.close();
+    if (target.staged !== null) {
+        const length = (await target.staged.getFile()).size;
+        if (length !== target.length) {
+            throw new DOMException(`The disk had room for ${length} of ${target.length} bytes.`, 'QuotaExceededError');
+        }
+        await target.holder.abort();
+        await target.staged.move(target.parent, target.name);
+    }
+}
+
+async function writeInto(target, write) {
     try {
-        const result = await write(target.writable, target.handle);
-        await target.writable.close();
+        const result = await write(target);
+        await finish(target);
         return result;
     } catch (error) {
         await abandon(target);
@@ -234,8 +295,32 @@ async function writeWhole(names, keepExistingData, write) {
     }
 }
 
-async function pipeBlob(blob, writable, signal) {
-    await blob.stream().pipeTo(writable, { signal, preventClose: true, preventAbort: true });
+async function writeWhole(names, keepExistingData, write) {
+    return await writeInto(await openTarget(names, keepExistingData), write);
+}
+
+// Not pipeTo: when a write fails, Firefox rejects a piped Blob stream with a TypeError that hides the QuotaExceededError.
+async function pump(readable, target, signal) {
+    const reader = readable.getReader();
+    try {
+        let next = await reader.read();
+        while (!next.done) {
+            signal?.throwIfAborted();
+            await put(target, next.value);
+            next = await reader.read();
+        }
+    } catch (error) {
+        try {
+            await reader.cancel();
+        } catch {
+            // The failure that led here is the one to report.
+        }
+        throw error;
+    }
+}
+
+async function pipeBlob(blob, target, signal) {
+    await pump(blob.stream(), target, signal);
     return blob.size;
 }
 
@@ -247,29 +332,33 @@ function copyOf(view) {
 
 export const writeBytes = guarded(async (names, view) => {
     const bytes = copyOf(view);
-    await writeWhole(names, false, writable => writable.write(bytes));
+    await writeWhole(names, false, target => put(target, bytes));
 });
 
 export const writeText = guarded(async (names, text) => {
-    await writeWhole(names, false, writable => writable.write(text));
+    const bytes = new TextEncoder().encode(text);
+    await writeWhole(names, false, target => put(target, bytes));
 });
 
 export const writeBlob = guarded(async (names, blob) => {
-    return await writeWhole(names, false, writable => pipeBlob(blob, writable));
+    return await writeWhole(names, false, target => pipeBlob(blob, target));
 });
 
 export const appendBytes = guarded(async (names, view) => {
     const bytes = copyOf(view);
-    await writeWhole(names, true, async (writable, handle) => {
-        await writable.seek((await handle.getFile()).size);
-        await writable.write(bytes);
+    await writeWhole(names, true, async target => {
+        await target.writable.seek((await target.handle.getFile()).size);
+        await put(target, bytes);
     });
 });
 
 export const truncate = guarded(async (names, length) => {
     const handle = await fileHandle(names);
     if ((await handle.getFile()).size > length) {
-        await writeWhole(names, true, writable => writable.truncate(length));
+        await writeWhole(names, true, async target => {
+            await target.writable.truncate(length);
+            target.length = length;
+        });
     }
 });
 
@@ -287,16 +376,21 @@ export const openWriter = guarded(async (names, keepExistingData) => {
 });
 
 export const writeToWriter = guarded(async (target, view) => {
-    const bytes = copyOf(view);
-    await target.writable.write(bytes);
+    await put(target, copyOf(view));
 });
 
 export const completeWriter = guarded(async target => {
-    await target.writable.close();
+    try {
+        await finish(target);
+    } catch (error) {
+        await abandon(target);
+        throw error;
+    }
 });
 
 export const abortWriter = guarded(async target => {
     await target.writable.abort();
+    await target.holder?.abort();
     await forget(target);
 });
 
@@ -308,24 +402,17 @@ export const copy = guarded(async (operationId, from, to) => {
     const controller = beginOperation(operationId);
     try {
         const file = await fileOf(from);
-        return await writeWhole(to, false, writable => pipeBlob(file, writable, controller.signal));
+        return await writeWhole(to, false, target => pipeBlob(file, target, controller.signal));
     } finally {
         state.operations.delete(operationId);
     }
 });
 
 async function copyOver(handle, destinationParent, destinationName, moveFailure) {
-    const destinationHandle = await destinationParent.getFileHandle(destinationName, { create: true });
-    const writable = await destinationHandle.createWritable();
     try {
-        await pipeBlob(await handle.getFile(), writable);
-        await writable.close();
+        const file = await handle.getFile();
+        await writeInto(await openTargetIn(destinationParent, destinationName, false), target => pipeBlob(file, target));
     } catch (error) {
-        try {
-            await writable.abort();
-        } catch {
-            // The failure that led here is the one to report.
-        }
         const reported = moveFailure === null ? '' : ` (moving it had failed with ${moveFailure.name}: ${moveFailure.message})`;
         throw { name: error?.name, message: `${error?.message}${reported}` };
     }
@@ -381,10 +468,9 @@ function counter(maxBytes, outcome) {
 async function pipeResponse(response, names, maxBytes, signal) {
     const outcome = { bytes: 0, tooLarge: false };
     try {
-        await writeWhole(names, false, async writable => {
+        await writeWhole(names, false, async target => {
             if (response.body !== null) {
-                await response.body.pipeThrough(counter(maxBytes, outcome), { signal })
-                    .pipeTo(writable, { signal, preventClose: true, preventAbort: true });
+                await pump(response.body.pipeThrough(counter(maxBytes, outcome), { signal }), target, signal);
             }
         });
     } catch (error) {
@@ -459,17 +545,17 @@ export const remove = guarded(async names => {
         const parent = await orNull(() => folder(names.slice(0, -1)));
         if (parent !== null) {
             await orNull(() => parent.removeEntry(names.at(-1), { recursive: true }));
+            await removeIfFree(parent, names.at(-1) + CHROMIUM_SWAP_SUFFIX);
+            await removeIfFree(parent, names.at(-1) + STAGED_SUFFIX);
         }
     }
 });
 
 // ---- Whole folders ----
 
-async function saveNote(target, name, content) {
-    const handle = await target.getFileHandle(name, { create: true });
-    const writable = await handle.createWritable();
-    await writable.write(content);
-    await writable.close();
+async function saveNote(parent, name, content) {
+    const bytes = new TextEncoder().encode(content);
+    await writeInto(await openTargetIn(parent, name, false), target => put(target, bytes));
 }
 
 async function moveContent(sourceNames, destinationNames) {
@@ -477,10 +563,10 @@ async function moveContent(sourceNames, destinationNames) {
     if (source !== null) {
         const destination = await folder(destinationNames, true);
         for (const [name, handle] of await entriesOf(source)) {
-            if (handle.kind === 'file') {
-                await moveEntry(source, name, handle, destination, name);
-            } else {
+            if (handle.kind === 'directory') {
                 await moveContent(sourceNames.concat([name]), destinationNames.concat([name]));
+            } else if (!isLeftover(name)) {
+                await moveEntry(source, name, handle, destination, name);
             }
         }
         await (await folder(sourceNames.slice(0, -1))).removeEntry(sourceNames.at(-1), { recursive: true });

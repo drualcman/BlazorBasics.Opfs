@@ -6,6 +6,10 @@ namespace BlazorBasics.Opfs.BrowserTests;
 /// </summary>
 internal static class BrowserEngines
 {
+    public const string CHROMIUM = "chromium";
+    public const string FIREFOX = "firefox";
+    public const string WEBKIT = "webkit";
+
     private const string OVERRIDE_VARIABLE = "OPFS_BROWSERS";
 
     public static IReadOnlyList<string> Names
@@ -13,7 +17,7 @@ internal static class BrowserEngines
         get
         {
             string? chosen = Environment.GetEnvironmentVariable(OVERRIDE_VARIABLE);
-            string[] names = OperatingSystem.IsWindows() ? ["chromium", "firefox"] : ["chromium", "firefox", "webkit"];
+            string[] names = OperatingSystem.IsWindows() ? [CHROMIUM, FIREFOX] : [CHROMIUM, FIREFOX, WEBKIT];
             return string.IsNullOrWhiteSpace(chosen) ? names : chosen.Split(',', StringSplitOptions.TrimEntries);
         }
     }

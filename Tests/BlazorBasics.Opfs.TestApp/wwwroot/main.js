@@ -12,6 +12,9 @@ globalThis.opfsTestHooks = {
     },
     heapBytes() {
         return globalThis.opfsRuntime.Module.HEAPU8.buffer.byteLength;
+    },
+    queryValue(name) {
+        return new URLSearchParams(location.search).get(name);
     }
 };
 
