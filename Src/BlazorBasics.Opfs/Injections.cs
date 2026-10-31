@@ -9,7 +9,7 @@ public static class Injections
 {
     /// <summary>
     /// Registers the file system, the locks and the storage information as singletons. It also succeeds on a server,
-    /// where a client project's startup runs for prerendering: only using a service there throws.
+    /// whose own startup needs this call for prerendering to resolve them: only using a service there throws.
     /// </summary>
     /// <param name="services">The container being built.</param>
     public static IServiceCollection AddOpfs(this IServiceCollection services)

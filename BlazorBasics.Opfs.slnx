@@ -11,5 +11,7 @@
     <Project Path="Tests/BlazorBasics.Opfs.ContractTests/BlazorBasics.Opfs.ContractTests.csproj" />
     <Project Path="Tests/BlazorBasics.Opfs.TestApp/BlazorBasics.Opfs.TestApp.csproj" />
     <Project Path="Tests/BlazorBasics.Opfs.Tests/BlazorBasics.Opfs.Tests.csproj" />
+    <Project Path="Tests/BlazorBasics.Opfs.WebApp/BlazorBasics.Opfs.WebApp.csproj" />
+    <Project Path="Tests/BlazorBasics.Opfs.WebApp.Client/BlazorBasics.Opfs.WebApp.Client.csproj" />
   </Folder>
 </Solution>

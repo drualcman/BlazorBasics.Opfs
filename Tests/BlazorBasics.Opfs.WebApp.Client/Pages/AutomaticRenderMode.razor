@@ -1,0 +1,46 @@
+@page "/auto"
+@rendermode InteractiveAuto
+@inject IOpfsFileSystem Files
+
+<PageTitle>InteractiveAuto</PageTitle>
+
+<h1>InteractiveAuto</h1>
+<p id="host">@HostName</p>
+<p id="probe-answered">@ProbeAnswered</p>
+<p id="probe-available">@ProbeAvailable</p>
+<p id="probe-reason">@ProbeReason</p>
+<p id="probe-failure-type">@ProbeFailureType</p>
+<button id="count" @onclick="Count">Count</button>
+<p id="clicks">@Clicks</p>
+
+@code {
+    private string HostName = "";
+    private bool ProbeAnswered;
+    private bool ProbeAvailable;
+    private string? ProbeReason;
+    private string? ProbeFailureType;
+    private int Clicks;
+
+    protected override void OnInitialized()
+    {
+        HostName = OperatingSystem.IsBrowser() ? "browser" : "server";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            OpfsProbeResult probe = await Files.ProbeAsync();
+            ProbeAvailable = probe.IsAvailable;
+            ProbeReason = probe.Reason;
+            ProbeFailureType = probe.Failure?.GetType().Name;
+            ProbeAnswered = true;
+            StateHasChanged();
+        }
+    }
+
+    private void Count()
+    {
+        Clicks++;
+    }
+}

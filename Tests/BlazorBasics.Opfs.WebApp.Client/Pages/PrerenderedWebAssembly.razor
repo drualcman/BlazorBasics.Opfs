@@ -1,0 +1,84 @@
+@page "/webassembly"
+@rendermode InteractiveWebAssembly
+@inject IOpfsFileSystem Files
+@inject IOpfsLocks Locks
+@inject IOpfsStorageInfo Storage
+
+<PageTitle>InteractiveWebAssembly</PageTitle>
+
+<h1>InteractiveWebAssembly</h1>
+<p id="host">@HostName</p>
+<p id="package-types">@PackageTypes</p>
+<p id="probe-available">@ProbeAvailable</p>
+<p id="write-failure-type">@WriteFailure?.GetType().Name</p>
+<p id="write-failure-message">@WriteFailure?.Message</p>
+<p id="lock-failure-type">@LockFailure?.GetType().Name</p>
+<p id="estimate-failure-type">@EstimateFailure?.GetType().Name</p>
+<p id="after-render-text">@AfterRenderText</p>
+<p id="after-render-listing">@AfterRenderListing</p>
+<p id="after-render-failure">@AfterRenderFailure</p>
+
+@code {
+    private const string FILE = "prerender/after-render.txt";
+    private const string TEXT = "written in the interactive phase";
+
+    private string HostName = "";
+    private int PackageTypes;
+    private bool ProbeAvailable;
+    private OpfsException? WriteFailure;
+    private OpfsException? LockFailure;
+    private OpfsException? EstimateFailure;
+    private string AfterRenderText = "";
+    private string AfterRenderListing = "";
+    private string AfterRenderFailure = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        HostName = OperatingSystem.IsBrowser() ? "browser" : "server";
+        PackageTypes = typeof(IOpfsFileSystem).Assembly.GetTypes().Length;
+        ProbeAvailable = (await Files.ProbeAsync()).IsAvailable;
+        try
+        {
+            await Files.WriteTextAsync("prerender/on-initialized.txt", "written on initialized");
+        }
+        catch (OpfsNotSupportedException failure)
+        {
+            WriteFailure = failure;
+        }
+        try
+        {
+            using IDisposable? held = await Locks.TryAcquireAsync("prerender", OpfsLockMode.Exclusive);
+        }
+        catch (OpfsNotSupportedException failure)
+        {
+            LockFailure = failure;
+        }
+        try
+        {
+            await Storage.EstimateAsync();
+        }
+        catch (OpfsNotSupportedException failure)
+        {
+            EstimateFailure = failure;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                await Files.WriteTextAsync(FILE, TEXT);
+                AfterRenderText = await Files.ReadTextAsync(FILE);
+                OpfsFolderContent listing = await Files.ListAsync("prerender");
+                AfterRenderListing = string.Join(",", listing.Files.Select(file => file.Name));
+            }
+            catch (OpfsException failure)
+            {
+                AfterRenderFailure = failure.ToString();
+            }
+            StateHasChanged();
+        }
+    }
+}

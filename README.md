@@ -129,9 +129,13 @@ OPFS is in the browser, and `[JSImport]` only works with .NET running there.
 | `InteractiveAuto` | **Not safe**: the first visit runs on the server until the runtime is downloaded |
 | `InteractiveServer`, static SSR, MAUI Blazor Hybrid | No |
 
-`AddOpfs()` succeeds on a server, because a client project's startup also runs there for prerendering. Calling an
-operation there throws `OpfsNotSupportedException`, and `ProbeAsync` answers "not available". With prerendering on, use
-`InteractiveWebAssembly` and call from `OnAfterRenderAsync`, not `OnInitializedAsync`.
+In a Blazor Web App, reference the package from the client project and call `AddOpfs()` in both `Program` files. The client
+one does not run on the server, and prerendering resolves the same services there, so a server without it fails with a 500.
+`AddOpfs()` succeeds on a server, and loading the types is safe. Calling an operation there throws
+`OpfsNotSupportedException`, and `ProbeAsync` answers "not available". With prerendering on, use `InteractiveWebAssembly` and
+call from `OnAfterRenderAsync`, not `OnInitializedAsync`, which runs on the server first. In `InteractiveAuto`, check
+`ProbeAsync` before any operation: it answers on the first visit without harming the circuit, and later visits run in the
+browser.
 
 The browser baseline is Chrome and Edge, Firefox 111+, Chrome Android 109+ and Safari 26+. Older browsers get a clear
 "not available" from `ProbeAsync`.
@@ -239,12 +243,16 @@ abstractions.
 
 ```
 dotnet test Tests/BlazorBasics.Opfs.Tests           # no browser: paths, errors, the double, the battery on the double
-dotnet test Tests/BlazorBasics.Opfs.BrowserTests    # the battery in real browsers, in a page and in a worker
+dotnet test Tests/BlazorBasics.Opfs.BrowserTests    # the battery in real browsers, in a page and in a worker, and the web app
 pwsh Tests/run-webkit-tests.ps1                     # the same in WebKit, on Linux through Docker
 pwsh Tests/run-webkit-tests.ps1 -Browsers chromium,firefox,webkit    # all three on Linux
 ```
 
 The tests that kill a browser or fill a disk only run in that container, which gives them a volume of their own.
+
+`Tests/BlazorBasics.Opfs.WebApp` and its `.Client` project are a Blazor Web App with `InteractiveWebAssembly` and
+`InteractiveAuto` pages, for `WebAppTests`, which runs it built and published in Release. It lives in `Tests` because its
+pages call the package where they should not, to prove what happens.
 
 The browser tests need Playwright's browsers once:
 `pwsh Tests/BlazorBasics.Opfs.BrowserTests/bin/Debug/net10.0/playwright.ps1 install chromium firefox`.

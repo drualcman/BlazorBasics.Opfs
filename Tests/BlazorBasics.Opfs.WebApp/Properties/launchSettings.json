@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "BlazorBasics.Opfs.WebApp": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "webassembly",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "http://127.0.0.1:57102"
+    }
+  }
+}
