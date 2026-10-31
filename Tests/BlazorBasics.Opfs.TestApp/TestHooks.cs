@@ -2,7 +2,7 @@ using System.Runtime.InteropServices.JavaScript;
 
 namespace BlazorBasics.Opfs.TestApp;
 
-/// <summary>What the tests ask of the page itself, in <c>main.js</c>.</summary>
+/// <summary>What the tests ask of the page or worker that hosts them, in <c>test-hooks.js</c>.</summary>
 internal static partial class TestHooks
 {
     [JSImport("globalThis.opfsTestHooks.disableMove")]
@@ -17,6 +17,9 @@ internal static partial class TestHooks
 
     [JSImport("globalThis.opfsTestHooks.heapBytes")]
     public static partial double HeapBytes();
+
+    [JSImport("globalThis.opfsTestHooks.inWorker")]
+    public static partial bool InWorker();
 
     [JSImport("globalThis.opfsTestHooks.queryValue")]
     public static partial string? QueryValue(string name);

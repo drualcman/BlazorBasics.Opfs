@@ -11,6 +11,7 @@ public sealed class OpfsErrorTranslatorTests
     [InlineData("NoModificationAllowedError", typeof(OpfsFileBusyException))]
     [InlineData("SecurityError", typeof(OpfsAccessDeniedException))]
     [InlineData("NotAllowedError", typeof(OpfsAccessDeniedException))]
+    [InlineData("NotSupportedError", typeof(OpfsNotSupportedException))]
     [InlineData("NotReadableError", typeof(OpfsException))]
     [InlineData("UnknownError", typeof(OpfsException))]
     public void A_browser_error_becomes_its_exception(string name, Type expected)

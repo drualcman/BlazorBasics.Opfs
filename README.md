@@ -104,6 +104,7 @@ Nothing is swallowed. Every failure is an `OpfsException`, which is an `IOExcept
 | `QuotaExceededError` | `OpfsQuotaExceededException` |
 | `NoModificationAllowedError` | `OpfsFileBusyException` |
 | `SecurityError`, `NotAllowedError` | `OpfsAccessDeniedException` |
+| `NotSupportedError`, or a call outside a browser | `OpfsNotSupportedException` |
 | Network failure or HTTP error status | `OpfsFetchException`, with `StatusCode` |
 | Anything else | `OpfsException` |
 
@@ -122,6 +123,7 @@ OPFS is in the browser, and `[JSImport]` only works with .NET running there.
 | Host | Works? |
 | --- | --- |
 | Blazor WebAssembly, plain WebAssembly, Uno | Yes |
+| A dedicated web worker, with .NET or with `opfs.js` alone | Yes, except `DownloadAsync` and `RequestPersistenceAsync` |
 | Blazor Web App, component with `InteractiveWebAssembly` | Yes, in the interactive phase |
 | Same, during prerendering | No: it runs on the server |
 | `InteractiveAuto` | **Not safe**: the first visit runs on the server until the runtime is downloaded |
@@ -133,6 +135,29 @@ operation there throws `OpfsNotSupportedException`, and `ProbeAsync` answers "no
 
 The browser baseline is Chrome and Edge, Firefox 111+, Chrome Android 109+ and Safari 26+. Older browsers get a clear
 "not available" from `ProbeAsync`.
+
+### In a worker
+
+The whole contract battery runs with .NET inside a dedicated worker in all three engines, so this needs nothing special.
+Start the runtime as a page would, with the path to `_framework` as seen from the worker script:
+
+```js
+import { dotnet } from '../_framework/dotnet.js';
+
+const runtime = await dotnet.create();
+await runtime.runMain();
+```
+
+The package finds `opfs.js` from the folder of the runtime, so the worker script can live anywhere. Without .NET, import
+`_content/BlazorBasics.Opfs/opfs.js` directly, from a module worker or with `import()` from a classic one.
+
+Two operations need a page and throw `OpfsNotSupportedException` in a worker, because the browser offers them only there:
+
+- `DownloadAsync` needs a `document`. In a worker, create the address with `CreateObjectUrlAsync` and post it to the page,
+  which can use it for as long as the worker lives.
+- `RequestPersistenceAsync` needs a page. `IsPersistedAsync` works in both.
+
+Shared and service workers are not tested.
 
 ## Browser differences to know
 
@@ -214,7 +239,7 @@ abstractions.
 
 ```
 dotnet test Tests/BlazorBasics.Opfs.Tests           # no browser: paths, errors, the double, the battery on the double
-dotnet test Tests/BlazorBasics.Opfs.BrowserTests    # the battery in real browsers
+dotnet test Tests/BlazorBasics.Opfs.BrowserTests    # the battery in real browsers, in a page and in a worker
 pwsh Tests/run-webkit-tests.ps1                     # the same in WebKit, on Linux through Docker
 pwsh Tests/run-webkit-tests.ps1 -Browsers chromium,firefox,webkit    # all three on Linux
 ```

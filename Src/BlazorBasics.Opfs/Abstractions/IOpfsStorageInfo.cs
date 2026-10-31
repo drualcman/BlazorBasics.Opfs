@@ -12,6 +12,9 @@ public interface IOpfsStorageInfo
     /// <summary>Whether the browser promised not to evict this site's storage.</summary>
     Task<bool> IsPersistedAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Asks the browser not to evict this site's storage, and returns whether it agreed.</summary>
+    /// <summary>
+    /// Asks the browser not to evict this site's storage, and returns whether it agreed. Only a page can ask: in a worker it
+    /// throws <see cref="Exceptions.OpfsNotSupportedException"/>.
+    /// </summary>
     Task<bool> RequestPersistenceAsync(CancellationToken cancellationToken = default);
 }

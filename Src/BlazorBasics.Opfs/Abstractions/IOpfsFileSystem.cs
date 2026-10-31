@@ -81,7 +81,10 @@ public interface IOpfsFileSystem
     /// <summary>Frees an address made by <see cref="CreateObjectUrlAsync"/>.</summary>
     void RevokeObjectUrl(string url);
 
-    /// <summary>Makes the browser save a file to the user's downloads. It needs a page: a worker cannot do it.</summary>
+    /// <summary>
+    /// Makes the browser save a file to the user's downloads. It needs a page: in a worker it throws
+    /// <see cref="Exceptions.OpfsNotSupportedException"/>.
+    /// </summary>
     Task DownloadAsync(OpfsPath file, string suggestedFileName, CancellationToken cancellationToken = default);
 
     /// <summary>Removes a file or a whole folder. What is not there counts as removed. The root is emptied, not removed.</summary>

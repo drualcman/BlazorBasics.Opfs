@@ -11,6 +11,7 @@ namespace BlazorBasics.Opfs.BrowserTests;
 public sealed class BrowserFixture : IAsyncLifetime
 {
     private const float RUN_TIMEOUT_MILLISECONDS = 600_000;
+    private const string WORKER_PAGE = "worker.html";
 
     private readonly ConcurrentDictionary<string, Lazy<Task<IReadOnlyDictionary<string, BrowserTestOutcome>>>> Runs = new();
     private readonly List<string> ProfileFolders = [];
@@ -25,8 +26,9 @@ public sealed class BrowserFixture : IAsyncLifetime
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
     }
 
-    public Task<IReadOnlyDictionary<string, BrowserTestOutcome>> OutcomesOfAsync(string engine) =>
-        Runs.GetOrAdd(engine, name => new Lazy<Task<IReadOnlyDictionary<string, BrowserTestOutcome>>>(() => RunAsync(name))).Value;
+    public Task<IReadOnlyDictionary<string, BrowserTestOutcome>> OutcomesOfAsync(string engine) => RunOnceAsync(engine, string.Empty);
+
+    public Task<IReadOnlyDictionary<string, BrowserTestOutcome>> WorkerOutcomesOfAsync(string engine) => RunOnceAsync(engine, WORKER_PAGE);
 
     public Task<IBrowserContext> NewContextAsync(string engine) => OpenProfileAsync(engine, NewProfile(Path.GetTempPath()));
 
@@ -86,11 +88,14 @@ public sealed class BrowserFixture : IAsyncLifetime
         return JsonSerializer.Deserialize<List<BrowserTestOutcome>>(json)!.ToDictionary(outcome => outcome.Name);
     }
 
-    private async Task<IReadOnlyDictionary<string, BrowserTestOutcome>> RunAsync(string engine)
+    private Task<IReadOnlyDictionary<string, BrowserTestOutcome>> RunOnceAsync(string engine, string relativeAddress) =>
+        Runs.GetOrAdd($"{engine}/{relativeAddress}", _ => new Lazy<Task<IReadOnlyDictionary<string, BrowserTestOutcome>>>(() => RunAsync(engine, relativeAddress))).Value;
+
+    private async Task<IReadOnlyDictionary<string, BrowserTestOutcome>> RunAsync(string engine, string relativeAddress)
     {
         await using IBrowserContext context = await NewContextAsync(engine);
         IPage page = await context.NewPageAsync();
-        await page.GotoAsync(Address);
+        await page.GotoAsync($"{Address.TrimEnd('/')}/{relativeAddress}");
         return await OutcomesOnAsync(page);
     }
 

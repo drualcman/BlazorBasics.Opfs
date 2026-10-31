@@ -513,7 +513,11 @@ export function revokeObjectUrl(url) {
 }
 
 export const downloadFile = guarded(async (names, suggestedFileName) => {
-    const address = URL.createObjectURL(await fileOf(names));
+    const file = await fileOf(names);
+    if (typeof document === 'undefined') {
+        throw new DOMException('A download needs a page and a worker has no document. Create an object URL with CreateObjectUrlAsync and hand it to the page while this worker lives.', 'NotSupportedError');
+    }
+    const address = URL.createObjectURL(file);
     const link = document.createElement('a');
     link.href = address;
     link.download = suggestedFileName;
@@ -648,4 +652,9 @@ export const estimate = guarded(async () => {
 
 export const isPersisted = guarded(async () => await navigator.storage.persisted());
 
-export const requestPersistence = guarded(async () => await navigator.storage.persist());
+export const requestPersistence = guarded(async () => {
+    if (typeof navigator.storage.persist !== 'function') {
+        throw new DOMException('Only a page can ask for persistent storage, not a worker. Ask from the page; a worker can read the answer with IsPersistedAsync.', 'NotSupportedError');
+    }
+    return await navigator.storage.persist();
+});

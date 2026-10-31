@@ -16,6 +16,7 @@ internal static class OpfsErrorTranslator
             "QuotaExceededError" => new OpfsQuotaExceededException(detail, name, failure),
             "NoModificationAllowedError" => new OpfsFileBusyException(detail, name, failure),
             "SecurityError" or "NotAllowedError" => new OpfsAccessDeniedException(detail, name, failure),
+            "NotSupportedError" => new OpfsNotSupportedException(detail, name, failure),
             FETCH_ERROR_NAME => FetchFailure(detail, failure),
             _ => new OpfsException(detail, name, failure)
         };
