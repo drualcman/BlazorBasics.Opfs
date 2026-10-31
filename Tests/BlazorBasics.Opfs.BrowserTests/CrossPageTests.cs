@@ -99,7 +99,7 @@ public sealed class CrossPageTests(BrowserFixture fixture)
         Assert.Equal("downloaded", await File.ReadAllTextAsync((await download.PathAsync())!));
     }
 
-    [Fact]
+    [ChromiumFact]
     public async Task A_full_quota_fails_at_write_and_leaves_the_previous_content()
     {
         await using IBrowserContext context = await fixture.NewContextAsync("chromium");
