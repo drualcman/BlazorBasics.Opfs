@@ -5,8 +5,8 @@ namespace BlazorBasics.Opfs.Services;
 public sealed class OpfsLocks : IOpfsLocks
 {
     /// <inheritdoc />
-    public Task<IDisposable?> TryAcquireAsync(string name, OpfsLockMode mode, CancellationToken cancellationToken = default) =>
-        OpfsCall.RunAsync<IDisposable?>(async () =>
+    public Task<IOpfsLock?> TryAcquireAsync(string name, OpfsLockMode mode, CancellationToken cancellationToken = default) =>
+        OpfsCall.RunAsync<IOpfsLock?>(async () =>
         {
             string browserMode = mode == OpfsLockMode.Exclusive ? "exclusive" : "shared";
             JSObject? holder = await OpfsCoordinationInterop.TryAcquireLockAsync(name, browserMode);

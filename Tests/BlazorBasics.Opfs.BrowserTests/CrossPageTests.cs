@@ -86,6 +86,27 @@ public sealed class CrossPageTests(BrowserFixture fixture)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task A_rejected_lock_request_means_lost_and_a_released_one_does_not(string engine)
+    {
+        await using IBrowserContext context = await fixture.NewContextAsync(engine);
+        IPage page = await OpenBlankPageAsync(context);
+
+        bool[] answers = await page.EvaluateAsync<bool[]>($$"""
+            async () => {
+                const opfs = {{MODULE}};
+                const held = await opfs.tryAcquireLock('lost', 'exclusive');
+                const released = opfs.whenLockLost(held);
+                opfs.releaseLock(held);
+                const rejected = opfs.whenLockLost({ request: Promise.reject(new DOMException('Gone', 'AbortError')) });
+                return [await released, await rejected];
+            }
+            """);
+
+        Assert.Equal([false, true], answers);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task A_file_downloads_with_its_suggested_name(string engine)
     {
         await using IBrowserContext context = await fixture.NewContextAsync(engine);

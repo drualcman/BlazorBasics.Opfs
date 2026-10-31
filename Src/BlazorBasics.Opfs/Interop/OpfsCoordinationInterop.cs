@@ -15,6 +15,10 @@ internal static partial class OpfsCoordinationInterop
     [JSImport("releaseLock", OpfsModule.MODULE_NAME)]
     public static partial void ReleaseLock(JSObject holder);
 
+    [JSImport("whenLockLost", OpfsModule.MODULE_NAME)]
+    [return: JSMarshalAs<JSType.Promise<JSType.Boolean>>]
+    public static partial Task<bool> WhenLockLostAsync(JSObject holder);
+
     [JSImport("estimate", OpfsModule.MODULE_NAME)]
     [return: JSMarshalAs<JSType.Promise<JSType.String>>]
     public static partial Task<string?> EstimateAsync();

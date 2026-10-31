@@ -17,10 +17,13 @@ internal sealed class BrowserTestAppServer : IAsyncDisposable
 {
     private readonly WebApplication Application;
 
-    private BrowserTestAppServer(WebApplication application)
+    private BrowserTestAppServer(WebApplication application, BackForwardReports backForward)
     {
         Application = application;
+        BackForward = backForward;
     }
+
+    public BackForwardReports BackForward { get; }
 
     public string Address => Application.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
 
@@ -41,8 +44,10 @@ internal sealed class BrowserTestAppServer : IAsyncDisposable
             DefaultContentType = "application/octet-stream"
         });
         FetchFixtureRoutes.Map(application);
+        BackForwardReports backForward = new();
+        backForward.Map(application);
         await application.StartAsync();
-        return new BrowserTestAppServer(application);
+        return new BrowserTestAppServer(application, backForward);
     }
 
     public async ValueTask DisposeAsync()

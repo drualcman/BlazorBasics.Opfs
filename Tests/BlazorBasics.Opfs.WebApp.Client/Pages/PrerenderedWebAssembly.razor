@@ -47,7 +47,7 @@
         }
         try
         {
-            using IDisposable? held = await Locks.TryAcquireAsync("prerender", OpfsLockMode.Exclusive);
+            using IOpfsLock? held = await Locks.TryAcquireAsync("prerender", OpfsLockMode.Exclusive);
         }
         catch (OpfsNotSupportedException failure)
         {

@@ -60,6 +60,16 @@ public sealed class BrowserFixture : IAsyncLifetime
         return await Playwright[engine].LaunchPersistentContextAsync(profile, options);
     }
 
+    public Task<IBrowserContext> OpenChromiumWithBackForwardCacheAsync() =>
+        Playwright[BrowserEngines.CHROMIUM].LaunchPersistentContextAsync(NewProfile(Path.GetTempPath()), new BrowserTypeLaunchPersistentContextOptions
+        {
+            Headless = true,
+            Channel = BrowserEngines.CHROMIUM,
+            IgnoreDefaultArgs = ["--disable-back-forward-cache"]
+        });
+
+    internal Task<string> BackForwardReportAsync(string run) => Server.BackForward.WaitForAsync(run);
+
     public async Task<IPage> OpenLimitedPageAsync(IBrowserContext context, string engine, string relativeAddress)
     {
         IPage page = await context.NewPageAsync();

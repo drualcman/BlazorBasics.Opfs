@@ -109,11 +109,11 @@ public sealed class BrowserOnlyTests : OpfsContractTestBase<BrowserContractTarge
         OpfsLocks first = new();
         OpfsLocks second = new();
 
-        IDisposable? held = await first.TryAcquireAsync(name, OpfsLockMode.Exclusive);
+        IOpfsLock? held = await first.TryAcquireAsync(name, OpfsLockMode.Exclusive);
         Assert.Null(await second.TryAcquireAsync(name, OpfsLockMode.Exclusive));
         held!.Dispose();
 
-        using IDisposable? again = await second.TryAcquireAsync(name, OpfsLockMode.Exclusive);
+        using IOpfsLock? again = await second.TryAcquireAsync(name, OpfsLockMode.Exclusive);
         Assert.NotNull(again);
     }
 

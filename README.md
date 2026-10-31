@@ -92,6 +92,18 @@ stops the request.
 OpfsFetchResult result = await files.FetchToAsync(url, "cache/photo.jpg", new OpfsFetchOptions { MaxBytes = 50_000_000 });
 ```
 
+A lock is released by disposing it, and the browser can also take it away while you hold it. If a lock protects more than a
+single short step, check it or watch for the loss:
+
+```csharp
+using IOpfsLock? held = await locks.TryAcquireAsync("database", OpfsLockMode.Exclusive);
+if (held is not null)
+{
+    held.Lost.Register(StopWritingAndWarnTheUser);
+    await WriteAsync(held.Lost);
+}
+```
+
 ## Errors
 
 Nothing is swallowed. Every failure is an `OpfsException`, which is an `IOException`, with the browser error in
@@ -198,6 +210,20 @@ A swap file is what a write leaves behind when it never finishes:
 Listings never show these leftovers: names ending in `.crswap` or `.opfs-staged` are left out, so do not give those endings
 to your own files.
 
+When someone leaves a page and comes back with the Back button, the browser may keep the page frozen in its back/forward
+cache and restore it as it was, .NET included. A held lock and an open writer then do this:
+
+| Behaviour | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| The page enters the cache with a lock held | Yes | **No**, so Back loads it again | Yes |
+| The lock while the page is in the cache | Stays held | Free as soon as the page is left | **Free as soon as the page is left** |
+| Another tab asks for that lock | Gets it, and the page is thrown out of the cache | Gets it | Gets it, and the page stays in the cache |
+| On coming back | Still held, or the page loads again if it was thrown out | The page loads again | **Restored without the lock: `Lost` is cancelled** |
+| An open writer | Keeps working | Keeps working | Keeps working |
+
+Only WebKit restores a page whose lock is gone, so `IsHeld` and `Lost` are for that case. In Chromium a call to
+`navigator.locks.query()` from another tab is enough to throw the page out too.
+
 - **Snapshots** are only valid until the next write. Do not let a write overlap a series of reads.
 - **`keepExistingData`** copies the whole file for as long as the writer is open, so usage doubles for a moment.
 - **Keep every file under half of the quota** if it has to be replaced or appended to, because of the swap.
@@ -214,6 +240,8 @@ to your own files.
 - **A closed tab or a killed browser** leaves the previous content and no visible leftovers in all three engines.
 
 The WebKit figures come from Playwright's build on Linux. Safari may differ, above all in the quota and the temporary folder.
+The back/forward cache was measured on stock Firefox 159 and, for WebKit, with no automation, because Playwright keeps
+Firefox and WebKit out of that cache. A lock held from a worker was not measured.
 
 ## From JavaScript
 
@@ -237,7 +265,7 @@ await files.WriteTextAsync("queue/a.meta", "{}");
 ```
 
 Downloads go through its `Fetcher` property, and `InMemoryOpfsLocks` and `InMemoryOpfsStorageInfo` cover the other two
-abstractions.
+abstractions. `InMemoryOpfsLocks.Lose(name)` takes a lock away from its holders, to test what your code does then.
 
 ## Developing this repository
 

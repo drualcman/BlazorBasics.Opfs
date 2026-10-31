@@ -4,5 +4,5 @@ namespace BlazorBasics.Opfs.Abstractions;
 public interface IOpfsLocks
 {
     /// <summary>Takes a lock if it is free right now, or returns null. Disposing the result releases it.</summary>
-    Task<IDisposable?> TryAcquireAsync(string name, OpfsLockMode mode, CancellationToken cancellationToken = default);
+    Task<IOpfsLock?> TryAcquireAsync(string name, OpfsLockMode mode, CancellationToken cancellationToken = default);
 }

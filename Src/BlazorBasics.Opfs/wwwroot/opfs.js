@@ -643,6 +643,11 @@ export function releaseLock(holder) {
     holder.release();
 }
 
+// A released lock resolves its request. Only the browser rejects it, as WebKit does on coming back from the back/forward cache.
+export function whenLockLost(holder) {
+    return holder.request.then(() => false, () => true);
+}
+
 // ---- Storage ----
 
 export const estimate = guarded(async () => {
