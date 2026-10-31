@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\BlazorBasics.Opfs.BrowserTests\BackForwardReports.cs" Link="BackForwardReports.cs" />
+    <Compile Include="..\BlazorBasics.Opfs.BrowserTests\DeviceReportRoute.cs" Link="DeviceReportRoute.cs" />
+    <Compile Include="..\BlazorBasics.Opfs.BrowserTests\FetchFixtureRoutes.cs" Link="FetchFixtureRoutes.cs" />
+  </ItemGroup>
+
+</Project>

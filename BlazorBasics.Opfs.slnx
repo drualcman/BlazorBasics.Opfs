@@ -9,6 +9,7 @@
   <Folder Name="/Tests/">
     <Project Path="Tests/BlazorBasics.Opfs.BrowserTests/BlazorBasics.Opfs.BrowserTests.csproj" />
     <Project Path="Tests/BlazorBasics.Opfs.ContractTests/BlazorBasics.Opfs.ContractTests.csproj" />
+    <Project Path="Tests/BlazorBasics.Opfs.DeviceHost/BlazorBasics.Opfs.DeviceHost.csproj" />
     <Project Path="Tests/BlazorBasics.Opfs.TestApp/BlazorBasics.Opfs.TestApp.csproj" />
     <Project Path="Tests/BlazorBasics.Opfs.Tests/BlazorBasics.Opfs.Tests.csproj" />
     <Project Path="Tests/BlazorBasics.Opfs.WebApp/BlazorBasics.Opfs.WebApp.csproj" />

@@ -241,7 +241,8 @@ Only WebKit restores a page whose lock is gone, so `IsHeld` and `Lost` are for t
 
 The WebKit figures come from Playwright's build on Linux. Safari may differ, above all in the quota and the temporary folder.
 The back/forward cache was measured on stock Firefox 159 and, for WebKit, with no automation, because Playwright keeps
-Firefox and WebKit out of that cache. A lock held from a worker was not measured.
+Firefox and WebKit out of that cache. A lock held from a worker was not measured. Stock Chrome 156, Edge 156 and Firefox 159
+on Windows gave the same answers for the snapshot, the move, the estimate after removing a file and the back/forward cache.
 
 ## From JavaScript
 
@@ -290,8 +291,14 @@ those tests run in Docker. WebKit also needs a persistent profile: in an ephemer
 
 Playwright's WebKit is not real Safari. These stay manual checks before a release:
 
+- [x] Chrome 156, Edge 156 and Firefox 159 on Windows
 - [ ] Safari on iOS 26
 - [ ] Chrome on Android
 - [ ] Firefox in private mode
+
+`pwsh Tests/run-device-checks.ps1` publishes the test app and serves `device.html` on port 5180, through a dev tunnel when
+`devtunnel` is installed, because a phone needs HTTPS for a secure context. That page runs the probe, the battery and the
+measurements behind the tables above, shows a summary that fits a screenshot, and sends the report to `artifacts/device-reports`
+on the computer. With `-NoTunnel` it only serves `http://127.0.0.1:5180`, which is enough for a browser on the same computer.
 
 The demo in `Samples/BlazorBasics.Opfs.Demo` is a diagnostics page: `dotnet run --project Samples/BlazorBasics.Opfs.Demo`.

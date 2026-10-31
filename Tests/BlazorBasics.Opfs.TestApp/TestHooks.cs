@@ -23,4 +23,7 @@ internal static partial class TestHooks
 
     [JSImport("globalThis.opfsTestHooks.queryValue")]
     public static partial string? QueryValue(string name);
+
+    [JSImport("globalThis.opfsTestHooks.reportProgress")]
+    public static partial void ReportProgress(string testName);
 }

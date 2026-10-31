@@ -8,6 +8,8 @@ namespace BlazorBasics.Opfs.TestApp;
 /// </summary>
 internal static class BrowserTestRunner
 {
+    private static readonly TimeSpan TestLimit = TimeSpan.FromMinutes(5);
+
     public static async Task<List<BrowserTestResult>> RunAsync(IEnumerable<Type> testClasses, string? onlyTest = null)
     {
         List<BrowserTestResult> results = [];
@@ -42,13 +44,14 @@ internal static class BrowserTestRunner
 
     private static async Task<BrowserTestResult> RunAsync(Type testClass, MethodInfo test, string name, object?[]? arguments)
     {
+        TestHooks.ReportProgress(name);
         string? failure = null;
         try
         {
             object instance = Activator.CreateInstance(testClass)!;
             if (test.Invoke(instance, arguments) is Task running)
             {
-                await running;
+                await running.WaitAsync(TestLimit);
             }
         }
         catch (Exception exception)

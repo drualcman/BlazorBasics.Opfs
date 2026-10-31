@@ -17,19 +17,23 @@ internal sealed class BrowserTestAppServer : IAsyncDisposable
 {
     private readonly WebApplication Application;
 
-    private BrowserTestAppServer(WebApplication application, BackForwardReports backForward)
+    private BrowserTestAppServer(WebApplication application, BackForwardReports backForward, string reportsFolder)
     {
         Application = application;
         BackForward = backForward;
+        ReportsFolder = reportsFolder;
     }
 
     public BackForwardReports BackForward { get; }
+
+    public string ReportsFolder { get; }
 
     public string Address => Application.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
 
     public static async Task<BrowserTestAppServer> StartAsync()
     {
         string publishedFolder = Path.Combine(AppContext.BaseDirectory, "BrowserTestApp", "wwwroot");
+        string reportsFolder = Path.Combine(Path.GetTempPath(), $"opfs-device-reports-{Guid.NewGuid():N}");
         PhysicalFileProvider files = new(publishedFolder);
         WebApplicationBuilder builder = WebApplication.CreateBuilder();
         builder.Logging.ClearProviders();
@@ -46,13 +50,15 @@ internal sealed class BrowserTestAppServer : IAsyncDisposable
         FetchFixtureRoutes.Map(application);
         BackForwardReports backForward = new();
         backForward.Map(application);
+        DeviceReportRoute.Map(application, reportsFolder);
         await application.StartAsync();
-        return new BrowserTestAppServer(application, backForward);
+        return new BrowserTestAppServer(application, backForward, reportsFolder);
     }
 
     public async ValueTask DisposeAsync()
     {
         await Application.StopAsync();
         await Application.DisposeAsync();
+        Directory.Delete(ReportsFolder, true);
     }
 }

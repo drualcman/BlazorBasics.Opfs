@@ -6,7 +6,10 @@ namespace BlazorBasics.Opfs.TestApp;
 /// <summary>The contract battery of this page or worker, whose results the browser tests read from <c>opfsContractResults</c>.</summary>
 internal static class ContractBatteryRun
 {
-    public static async Task RunAsync()
+    public static async Task RunAsync() =>
+        JSHost.GlobalThis.SetProperty("opfsContractResults", JsonSerializer.Serialize(await RunBatteryAsync()));
+
+    public static async Task<List<BrowserTestResult>> RunBatteryAsync()
     {
         OpfsFileSystem fileSystem = new();
         await fileSystem.DeleteAsync(BrowserContractTarget.TESTS_FOLDER);
@@ -35,6 +38,6 @@ internal static class ContractBatteryRun
             : await BrowserTestRunner.RunAsync([typeof(QuotaExhaustionTests)], quotaTest);
 
         await fileSystem.DeleteAsync(BrowserContractTarget.TESTS_FOLDER);
-        JSHost.GlobalThis.SetProperty("opfsContractResults", JsonSerializer.Serialize(results));
+        return results;
     }
 }

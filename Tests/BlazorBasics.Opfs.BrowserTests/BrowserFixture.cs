@@ -68,7 +68,16 @@ public sealed class BrowserFixture : IAsyncLifetime
             IgnoreDefaultArgs = ["--disable-back-forward-cache"]
         });
 
+    public Task<IBrowserContext> OpenFirefoxPrivateAsync() =>
+        Playwright[BrowserEngines.FIREFOX].LaunchPersistentContextAsync(NewProfile(Path.GetTempPath()), new BrowserTypeLaunchPersistentContextOptions
+        {
+            Headless = true,
+            FirefoxUserPrefs = new Dictionary<string, object> { ["browser.privatebrowsing.autostart"] = true }
+        });
+
     internal Task<string> BackForwardReportAsync(string run) => Server.BackForward.WaitForAsync(run);
+
+    public IEnumerable<string> DeviceReports() => Directory.GetFiles(Server.ReportsFolder).Select(File.ReadAllText);
 
     public async Task<IPage> OpenLimitedPageAsync(IBrowserContext context, string engine, string relativeAddress)
     {

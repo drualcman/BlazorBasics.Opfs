@@ -16,5 +16,8 @@ globalThis.opfsTestHooks = {
     },
     queryValue(name) {
         return new URLSearchParams(location.search).get(name);
+    },
+    reportProgress(testName) {
+        globalThis.opfsTestProgress?.(testName);
     }
 };

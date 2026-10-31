@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BlazorBasics.Opfs device checks</title>
+    <style>
+        body { font: 16px system-ui, sans-serif; margin: 16px; max-width: 42rem; color: #111; background: #fff; }
+        label { display: block; margin-bottom: 12px; }
+        input { display: block; width: 100%; box-sizing: border-box; font: inherit; padding: 8px; margin-top: 4px; }
+        button { font: inherit; padding: 10px 14px; margin: 0 8px 8px 0; }
+        #status { min-height: 3em; overflow-wrap: anywhere; }
+        pre { font: 13px/1.35 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; background: #f2f2f2; padding: 12px; }
+        details { margin-top: 12px; }
+    </style>
+    <script type="module" src="./device.js"></script>
+</head>
+<body>
+    <h1>Device checks</h1>
+    <label>Device, system and mode
+        <input id="device" placeholder="iPhone 15, iOS 26.1, normal" autocomplete="off" />
+    </label>
+    <button id="run-all" disabled>Run everything</button>
+    <button id="run-measurements" disabled>Measurements only</button>
+    <button id="run-battery" disabled>Battery only</button>
+    <button id="run-back-forward" disabled>Back/forward only</button>
+    <button id="copy">Copy report</button>
+    <button id="reset">Start again</button>
+    <p id="status">Loading .NET...</p>
+    <pre id="summary"></pre>
+    <details>
+        <summary>Full report</summary>
+        <pre id="report"></pre>
+    </details>
+</body>
+</html>
