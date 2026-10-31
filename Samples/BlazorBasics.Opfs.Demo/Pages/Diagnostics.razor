@@ -37,7 +37,7 @@
                     <td>@file.Length</td>
                     <td>@file.ModifiedUtc.ToString("u")</td>
                     <td>
-                        <button @onclick="() => FileSystem.DownloadAsync(file.Name, OpfsPath.Parse(file.Name).Name)">Download</button>
+                        <button @onclick="() => DownloadAsync(file.Name)">Download</button>
                         <button @onclick="() => DeleteAsync(file.Name)">Delete</button>
                     </td>
                 </tr>
@@ -63,35 +63,39 @@
             ProbeText = probe.IsAvailable ? "OPFS is available." : $"OPFS is not available: {probe.Reason}";
             if (probe.IsAvailable)
             {
-                IsPersisted = await Storage.IsPersistedAsync();
-                await RefreshAsync();
+                await GuardedAsync(async () =>
+                {
+                    IsPersisted = await Storage.IsPersistedAsync();
+                    await LoadFilesAsync();
+                });
             }
             StateHasChanged();
         }
     }
 
-    private async Task RequestPersistenceAsync() => IsPersisted = await Storage.RequestPersistenceAsync();
+    private Task RequestPersistenceAsync() => GuardedAsync(async () => IsPersisted = await Storage.RequestPersistenceAsync());
 
-    private async Task WriteAsync()
-    {
-        await GuardedAsync(() => FileSystem.WriteTextAsync(NewPath, NewText));
-        await RefreshAsync();
-    }
+    private Task RefreshAsync() => GuardedAsync(LoadFilesAsync);
 
-    private async Task DeleteAsync(string path)
+    private Task WriteAsync() => GuardedAsync(async () =>
     {
-        await GuardedAsync(() => FileSystem.DeleteAsync(path));
-        await RefreshAsync();
-    }
+        await FileSystem.WriteTextAsync(NewPath, NewText);
+        await LoadFilesAsync();
+    });
 
-    private async Task RefreshAsync()
+    private Task DeleteAsync(string path) => GuardedAsync(async () =>
     {
-        await GuardedAsync(async () =>
-        {
-            Files = await FileSystem.ListTreeAsync(OpfsPath.Root);
-            OpfsStorageEstimate? estimate = await Storage.EstimateAsync();
-            EstimateText = estimate is null ? "The browser gives no estimate." : $"{estimate.Usage:N0} of {estimate.Quota:N0} bytes used.";
-        });
+        await FileSystem.DeleteAsync(path);
+        await LoadFilesAsync();
+    });
+
+    private Task DownloadAsync(string path) => GuardedAsync(() => FileSystem.DownloadAsync(path, OpfsPath.Parse(path).Name));
+
+    private async Task LoadFilesAsync()
+    {
+        Files = await FileSystem.ListTreeAsync(OpfsPath.Root);
+        OpfsStorageEstimate? estimate = await Storage.EstimateAsync();
+        EstimateText = estimate is null ? "The browser gives no estimate." : $"{estimate.Usage:N0} of {estimate.Quota:N0} bytes used.";
     }
 
     private async Task GuardedAsync(Func<Task> operation)
@@ -101,7 +105,7 @@
         {
             await operation();
         }
-        catch (OpfsException exception)
+        catch (Exception exception) when (exception is OpfsException or ArgumentException)
         {
             Failure = $"{exception.GetType().Name}: {exception.Message}";
         }

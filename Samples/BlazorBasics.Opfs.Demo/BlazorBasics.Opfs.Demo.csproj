@@ -5,6 +5,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
+		<UseSystemResourceKeys>false</UseSystemResourceKeys>
 	</PropertyGroup>
 
 	<ItemGroup>
