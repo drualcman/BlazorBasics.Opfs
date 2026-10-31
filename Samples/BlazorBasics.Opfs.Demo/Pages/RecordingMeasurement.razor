@@ -1,0 +1,115 @@
+@page "/recording"
+@using BlazorBasics.Opfs.Demo.Measurement
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IOpfsFileSystem FileSystem
+@inject IOpfsStorageInfo Storage
+@inject IJSRuntime JavaScript
+
+<PageTitle>Recording measurement</PageTitle>
+
+<style>
+    .measurement { max-width: 40rem; margin: 0 auto; padding: 0 1rem; font-family: system-ui, sans-serif; }
+    .measurement video { display: block; width: 100%; max-height: 40vh; background: #000; }
+    .measurement textarea { box-sizing: border-box; width: 100%; height: 18rem; font: 0.75rem monospace; }
+    .measurement button { min-height: 3rem; margin: 0.5rem 0.5rem 0.5rem 0; padding: 0 1rem; font-size: 1rem; }
+</style>
+
+<main class="measurement">
+    <h1>Recording measurement</h1>
+    <p>Records 60 seconds through one <code>IOpfsWriter</code>. Keep this page in front and the screen on.</p>
+
+    <video @ref="Preview" muted playsinline></video>
+    <button disabled="@IsRunning" @onclick="RunAsync">Record 60 seconds</button>
+    <p role="status">@Status</p>
+
+    @if (Run is not null && IsRunning)
+    {
+        <p>@Run.ElapsedSeconds.ToString("0") s, @Run.Chunks.Count chunks written</p>
+    }
+
+    <h2>Playback</h2>
+    <video @ref="Playback" controls playsinline></video>
+
+    <h2>Report</h2>
+    <textarea @ref="ReportArea" readonly value="@Report"></textarea>
+    <button disabled="@(Report.Length == 0)" @onclick="CopyAsync">Copy report</button>
+    <button disabled="@(IsRunning || Run?.VideoUrl is null)" @onclick="DeleteAsync">Delete the video</button>
+    <p role="status">@CopyStatus</p>
+</main>
+
+@code {
+    private const int RENDER_MILLISECONDS = 250;
+
+    private ElementReference Preview;
+    private ElementReference Playback;
+    private ElementReference ReportArea;
+    private IJSObjectReference? Module;
+    private RecordingRun? Run;
+    private bool IsRunning;
+    private string Status = "Ready.";
+    private string CopyStatus = string.Empty;
+    private string Report = string.Empty;
+
+    private async Task RunAsync()
+    {
+        IsRunning = true;
+        Report = string.Empty;
+        CopyStatus = string.Empty;
+        Status = "Recording...";
+        ReleaseVideo();
+        Module ??= await JavaScript.InvokeAsync<IJSObjectReference>("import", "./recording-measurement.js");
+        Run = new RecordingRun(FileSystem, Storage, Module, () => _ = InvokeAsync(StateHasChanged));
+
+        using PeriodicTimer rendering = new(TimeSpan.FromMilliseconds(RENDER_MILLISECONDS));
+        Task renders = RenderWhileRecordingAsync(rendering);
+        await Run.RunAsync(Preview, Playback);
+        rendering.Dispose();
+        await renders;
+
+        Report = RecordingReport.Build(Run);
+        Status = Run.Failure ?? "Finished.";
+        IsRunning = false;
+    }
+
+    private async Task RenderWhileRecordingAsync(PeriodicTimer timer)
+    {
+        while (await timer.WaitForNextTickAsync())
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CopyAsync()
+    {
+        bool copied = await Module!.InvokeAsync<bool>("copyText", ReportArea);
+        CopyStatus = copied ? "Copied." : "Could not copy: select the text by hand.";
+    }
+
+    private async Task DeleteAsync()
+    {
+        ReleaseVideo();
+        await FileSystem.DeleteAsync(RecordingRun.Folder);
+        OpfsStorageEstimate? estimate = await Storage.EstimateAsync();
+        Status = $"Deleted. estimate() now says {estimate?.Usage:N0} bytes used.";
+    }
+
+    private void ReleaseVideo()
+    {
+        if (Run?.VideoUrl is not null)
+        {
+            FileSystem.RevokeObjectUrl(Run.VideoUrl);
+        }
+        Run = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        ReleaseVideo();
+        if (Module is not null)
+        {
+            await Module.InvokeVoidAsync("closeCamera");
+            await Module.DisposeAsync();
+        }
+    }
+}
