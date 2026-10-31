@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GeneratePackageOnBuild Condition="'$(Configuration)' == 'Release'">true</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+		<Version>1.0.0</Version>
+		<Authors>Sergi Ortiz Gomez</Authors>
+		<Company>DrUalcman</Company>
+		<Description>
+			An in-memory double of BlazorBasics.Opfs for plain dotnet test: no browser needed. It passes the same
+			contract battery as the real file system, so it cannot drift from real behaviour.
+		</Description>
+		<PackageTags>OPFS;Testing;InMemory;FileSystem;Blazor;WebAssembly</PackageTags>
+		<PackageReleaseNotes>Version 1.0.0: First release.</PackageReleaseNotes>
+		<Copyright>Free</Copyright>
+		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/drualcman/BlazorBasics.Opfs</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/drualcman/BlazorBasics.Opfs</PackageProjectUrl>
+		<RepositoryType>Git</RepositoryType>
+		<PackageIcon>icon-512.png</PackageIcon>
+		<PackageIconUrl />
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\BlazorBasics.Opfs\BlazorBasics.Opfs.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\..\icon-512.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\LICENSE.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+</Project>

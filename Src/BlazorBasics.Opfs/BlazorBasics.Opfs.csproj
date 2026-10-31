@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<GeneratePackageOnBuild Condition="'$(Configuration)' == 'Release'">true</GeneratePackageOnBuild>
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+		<Version>1.0.0</Version>
+		<Authors>Sergi Ortiz Gomez</Authors>
+		<Company>DrUalcman</Company>
+		<Description>
+			A high level file system for .NET running in the browser, over the Origin Private File System.
+			Paths instead of handles, atomic writes, typed errors, and large bytes that never cross into
+			WebAssembly memory: copying, downloading and uploading stay in JavaScript. No dependency on
+			Blazor: it works in Blazor WebAssembly, plain WebAssembly and Uno. WebAssembly only.
+		</Description>
+		<PackageTags>OPFS;OriginPrivateFileSystem;FileSystem;Storage;Files;Blazor;WebAssembly;Browser;Wasm;Offline</PackageTags>
+		<PackageReleaseNotes>
+			Version 1.0.0: First release. Path based reads and writes through createWritable, writers,
+			snapshots, lazy read streams, copy, move and fetch with no bytes in .NET, recoverable folder
+			moves, Web Locks, storage estimate and persistence, and typed errors.
+		</PackageReleaseNotes>
+		<Copyright>Free</Copyright>
+		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/drualcman/BlazorBasics.Opfs</RepositoryUrl>
+		<PackageProjectUrl>https://github.com/drualcman/BlazorBasics.Opfs</PackageProjectUrl>
+		<RepositoryType>Git</RepositoryType>
+		<PackageIcon>icon-512.png</PackageIcon>
+		<PackageIconUrl />
+	</PropertyGroup>
+
+	<ItemGroup>
+		<SupportedPlatform Include="browser" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>BlazorBasics.Opfs.Tests</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\..\icon-512.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\LICENSE.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+</Project>

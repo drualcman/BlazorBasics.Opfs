@@ -1,0 +1,109 @@
+@page "/"
+@inject IOpfsFileSystem FileSystem
+@inject IOpfsStorageInfo Storage
+
+<PageTitle>BlazorBasics.Opfs diagnostics</PageTitle>
+
+<h1>BlazorBasics.Opfs diagnostics</h1>
+
+<section>
+    <h2>Browser</h2>
+    <p>@ProbeText</p>
+    <p>@EstimateText</p>
+    <p>Persisted: @IsPersisted <button @onclick="RequestPersistenceAsync">Request persistence</button></p>
+</section>
+
+<section>
+    <h2>Write a file</h2>
+    <label>Path <input @bind="NewPath" /></label>
+    <label>Text <input @bind="NewText" /></label>
+    <button @onclick="WriteAsync">Write</button>
+</section>
+
+<section>
+    <h2>Files</h2>
+    <button @onclick="RefreshAsync">Refresh</button>
+    @if (Failure.Length > 0)
+    {
+        <p role="alert">@Failure</p>
+    }
+    <table>
+        <thead><tr><th>Path</th><th>Bytes</th><th>Modified</th><th></th></tr></thead>
+        <tbody>
+            @foreach (OpfsFileInfo file in Files)
+            {
+                <tr>
+                    <td>@file.Name</td>
+                    <td>@file.Length</td>
+                    <td>@file.ModifiedUtc.ToString("u")</td>
+                    <td>
+                        <button @onclick="() => FileSystem.DownloadAsync(file.Name, OpfsPath.Parse(file.Name).Name)">Download</button>
+                        <button @onclick="() => DeleteAsync(file.Name)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@code {
+    private string ProbeText = "Probing...";
+    private string EstimateText = string.Empty;
+    private bool IsPersisted;
+    private string NewPath = "demo/hello.txt";
+    private string NewText = "Hello from OPFS";
+    private string Failure = string.Empty;
+    private IReadOnlyList<OpfsFileInfo> Files = [];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            OpfsProbeResult probe = await FileSystem.ProbeAsync();
+            ProbeText = probe.IsAvailable ? "OPFS is available." : $"OPFS is not available: {probe.Reason}";
+            if (probe.IsAvailable)
+            {
+                IsPersisted = await Storage.IsPersistedAsync();
+                await RefreshAsync();
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task RequestPersistenceAsync() => IsPersisted = await Storage.RequestPersistenceAsync();
+
+    private async Task WriteAsync()
+    {
+        await GuardedAsync(() => FileSystem.WriteTextAsync(NewPath, NewText));
+        await RefreshAsync();
+    }
+
+    private async Task DeleteAsync(string path)
+    {
+        await GuardedAsync(() => FileSystem.DeleteAsync(path));
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        await GuardedAsync(async () =>
+        {
+            Files = await FileSystem.ListTreeAsync(OpfsPath.Root);
+            OpfsStorageEstimate? estimate = await Storage.EstimateAsync();
+            EstimateText = estimate is null ? "The browser gives no estimate." : $"{estimate.Usage:N0} of {estimate.Quota:N0} bytes used.";
+        });
+    }
+
+    private async Task GuardedAsync(Func<Task> operation)
+    {
+        Failure = string.Empty;
+        try
+        {
+            await operation();
+        }
+        catch (OpfsException exception)
+        {
+            Failure = $"{exception.GetType().Name}: {exception.Message}";
+        }
+    }
+}
